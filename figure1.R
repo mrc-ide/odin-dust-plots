@@ -68,6 +68,43 @@ pf_data <- sircovid::sircovid_data(first_wave_data,
                                    start_date = "2020-01-01", 
                                    dt = 1 / steps_per_day)
 
+# Set up pmcmc
+start_date_param <-
+  mcstate::pmcmc_parameter("start_date",
+                           initial = sircovid::sircovid_date("2020-02-08"),
+                           min = sircovid::sircovid_date("2020-01-01"),
+                           max = sircovid::sircovid_date("2020-03-15"),
+                           discrete = TRUE)
+beta_date <- c("2020-03-16", "2020-03-23", "2020-03-25")
+beta_min <- 0
+beta_max <- 1
+beta1_param <- mcstate::pmcmc_parameter("beta1", initial = 0.15, min = beta_min, max = beta_max)
+beta2_param <- mcstate::pmcmc_parameter("beta2", initial = 0.04, min = beta_min, max = beta_max)
+beta3_param <- mcstate::pmcmc_parameter("beta3", initial = 0.03, min = beta_min, max = beta_max)
+mcmc_param_list <- list(start_date_param, beta1_param, beta2_param, beta3_param)
+
+parameter_transform <- function(beta_date) {
+  beta_date <- sircovid::sircovid_date(beta_date)
+  function(pars) {
+    start_date <- pars[["start_date"]]
+    beta_value <- unname(pars[c("beta1", "beta2", "beta3")])
+    ret <- sircovid::carehomes_parameters(region = "england",
+                                          start_date = start_date, 
+                                          beta_value = beta_value,
+                                          beta_date = beta_date,
+                                          C_1 = 3e-7,
+                                          C_2 = 3e-7)
+    ret
+  }
+}
+
+cov_mat <- as.matrix(read.table("cov_proposals.csv", sep = ",", header = F),
+                     nrow = length(mcmc_param_list), ncol = length(mcmc_param_list))
+mcmc_params <- mcstate::pmcmc_parameters$new(mcmc_param_list, 
+                                             mcmc_proposals, 
+                                             parameter_transform(beta_date))
+
+# Run the pMCMC
 n_chains <- 1L
 n_steps <- 1e2
 n_particles <- 96L

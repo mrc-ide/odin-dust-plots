@@ -100,8 +100,10 @@ parameter_transform <- function(beta_date) {
 
 cov_mat <- as.matrix(read.table("cov_proposals.csv", sep = ",", header = F),
                      nrow = length(mcmc_param_list), ncol = length(mcmc_param_list))
+cov_params <- c("start_date", "beta1", "beta2", "beta3")
+colnames(cov_mat) <- rownames(cov_mat) <- cov_params
 mcmc_params <- mcstate::pmcmc_parameters$new(mcmc_param_list, 
-                                             mcmc_proposals, 
+                                             cov_mat, 
                                              parameter_transform(beta_date))
 
 # Run the pMCMC

@@ -1,8 +1,10 @@
-sirs_gen <- dust::dust_example("sirs")
+library(backports)
+
+sirs_gen <- odin.dust::odin_dust("sirs.R")
 sirs_times <- rep(NA_real_, 16)
 for (i in seq(1, 16)) {
-  sir <- sirs_gen$new(data=list(I_ini=1), n_particles = 1000L, n_threads = as.integer(i), step = 0)
-  sirs_times[i] <- bench::system_time(sir$run(500000))['real']
+  sirs <- sirs_gen$new(data=list(I_ini=1), n_particles = 1000L, n_threads = as.integer(i), step = 0)
+  sirs_times[i] <- bench::system_time(sirs$run(500000))['real']
 }
 
 volatility_gen <- dust::dust_example("volatility")

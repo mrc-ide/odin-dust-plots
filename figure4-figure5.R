@@ -214,7 +214,7 @@ matplot(gamma, type = "l", lty = 1,
         ylab = "gamma", col = cols)
 
 par(fig=c(0.4,0.9,0,0.33), new = TRUE)
-hist(c(beta)/c(gamma), main = "", breaks = seq(1.4, 2.6, 0.1), xlab = "R0")
+hist(c(beta)/c(gamma), main = "", breaks = 14, xlab = "R0")
 
 par(fig=c(0,0.3,0,0.33), xpd=TRUE, new = TRUE)
 plot.new()

@@ -20,7 +20,7 @@ for (i in seq(1, 16)) {
   volatility_small_times[i] <- bench::system_time(volatility$run(500000))['real']
 }
 
-sirs_gen <- dust::dust_example("sir")
+sir_gen <- dust::dust_example("sir")
 sir_times <- rep(NA_real_, 16)
 for (i in seq(1, 16)) {
   sir <- sir_gen$new(data=list(), n_particles = 1000L, n_threads = as.integer(i), step = 0)

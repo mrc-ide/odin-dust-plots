@@ -1,0 +1,184 @@
+---
+title: "SIR model (pomp)"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+library(pomp)
+library(foreach)
+library(doParallel)
+library(doRNG)
+registerDoParallel()
+registerDoRNG(998468235L)
+```
+
+Update function (in C):
+
+```{r}
+rproc <- Csnippet("
+  double pop = S + I + R;
+  
+  double p_SI = 0;
+  if (beta > 0) {
+    p_SI = 1.0-exp(-beta*I/pop);
+  }
+  double p_IR = 0;
+  if (gamma > 0) {
+    p_IR = 1.0-exp(-gamma);
+  }
+
+  n_SI = rbinom(S, p_SI * dt);
+  double n_IR = rbinom(I, p_IR * dt);
+  
+  S -= n_SI;
+  I += n_SI - n_IR;
+  R += n_IR;
+")
+```
+
+Initial state (in C):
+
+```{r}
+rinit <- Csnippet("
+  S = nearbyint(S_0);
+  I = nearbyint(I_0);
+  R = 0;
+")
+```
+
+Measurement model density (in C):
+
+```{r}
+dmeas <- Csnippet("
+  lik = dpois(cases, n_SI + 1e-6, give_log);
+")
+```
+
+Measurement model simulation (in C):
+
+```{r}
+rmeas <- Csnippet("
+  cases = nearbyint(rpois(n_SI));
+")
+```
+
+pomp object:
+
+```{r}
+  pomp(data=incidence_data,
+    t0=0, times="day",
+    rprocess=euler(rproc, delta.t = 0.25),
+    dmeasure=dmeas,
+    rmeasure=rmeas,
+    rinit=rinit,
+    partrans=parameter_trans(
+      log=c("beta","gamma"),
+      barycentric=c("S_0","I_0","R_0")
+    ),
+    statenames=c("S","I","R","n_SI"),
+    paramnames=c("beta","gamma", "S_0","I_0","R_0")
+  ) -> m1
+```
+
+Run particle filter:
+
+```{r}
+params <- c(beta = 0.2, gamma = 0.1, S_0 = 1000, I_0 = 10, R_0 = 0)
+
+foreach(i=1:4) %dopar% {
+  m1 %>% pfilter(params=params, Np = 100, verbose=TRUE)
+} -> pfs
+
+pfs %>% sapply(logLik) %>% logmeanexp(se=TRUE)
+plot(pfs[[1]])
+```
+
+Infer parameters:
+
+```{r}
+inferred <- pomp::pmcmc(m1,
+                        Nmcmc = 2000, 
+                        Np = 100, 
+                        params = params, 
+                        dprior = NULL,
+                        proposal = mvn.diag.rw(c(beta=0.01,gamma=0.01)))
+plot(inferred)
+```
+
+Simulator (in R):
+
+```{r}
+rproc_r <- function(S, I, R, n_SI, beta, gamma, delta.t, ...) {
+  pop = S + I + R
+
+  p_SI = 0
+  if (beta > 0) {
+    p_SI = 1-exp(-beta*I/pop)
+  }
+  p_IR = 0
+  if (gamma > 0) {
+    p_IR = 1-exp(-gamma)
+  }
+
+  n_SI = rbinom(n=1, size = S, prob = p_SI * delta.t)
+  n_IR = rbinom(n=1, size = I, prob = p_IR * delta.t)
+  
+  S = S - n_SI
+  I = I + n_SI - n_IR
+  R = R + n_IR
+  c(S = S, I = I, R = R, n_SI = n_SI)
+}
+```
+
+Initial state (in R):
+
+```{r}
+rinit_r <- function(S_0, I_0, R_0, ...) {
+  S = round(S_0)
+  I = round(I_0)
+  R = 0
+  n_SI = 0
+  c(S = S, I = I, R = R, n_SI = n_SI)
+}
+```
+
+Measurement model density (in R):
+
+```{r}
+dmeas_r <- function(log, cases, n_SI, ...) {
+  dpois(cases, n_SI + 1e-6, log)
+}
+```
+
+Measurement model simulation (in R):
+
+```{r}
+rmeas_r <- function(n_SI, ...) {
+  c(cases = round(rpois(n = 1, lambda = n_SI)))
+}
+```
+
+pomp object:
+
+```{r}
+  pomp(data=incidence_data,
+    t0=0, times="day",
+    rprocess=euler(rproc_r, delta.t = 0.25),
+    dmeasure=dmeas_r,
+    rinit=rinit_r,
+    rmeasure = rmeas_r,
+    partrans=parameter_trans(
+      log=c("beta","gamma"),
+      barycentric=c("S_0","I_0","R_0")
+    ),
+    statenames=c("S","I","R","n_SI"),
+    paramnames=c("beta","gamma", "S_0","I_0","R_0")
+  ) -> m1_r
+```
+
+```{r}
+plot(simulate(m1_r, params=c(beta = 0.2, gamma = 0.1, S_0 = 1000, I_0 = 10, R_0 = 0), nsim = 1)[[1]])
+```
+

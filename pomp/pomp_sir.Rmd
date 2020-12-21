@@ -14,6 +14,10 @@ registerDoParallel()
 registerDoRNG(998468235L)
 ```
 
+```{r}
+incidence_data <- read.csv("../sir_incidence_data.csv")
+```
+
 Update function (in C):
 
 ```{r}
@@ -67,7 +71,7 @@ rmeas <- Csnippet("
 pomp object:
 
 ```{r}
-  pomp(data=incidence_data,
+m1 <- pomp(data=incidence_data,
     t0=0, times="day",
     rprocess=euler(rproc, delta.t = 0.25),
     dmeasure=dmeas,
@@ -79,7 +83,7 @@ pomp object:
     ),
     statenames=c("S","I","R","n_SI"),
     paramnames=c("beta","gamma", "S_0","I_0","R_0")
-  ) -> m1
+  )
 ```
 
 Run particle filter:
@@ -163,7 +167,8 @@ rmeas_r <- function(n_SI, ...) {
 pomp object:
 
 ```{r}
-  pomp(data=incidence_data,
+m1_r <- pomp(
+    data=incidence_data,
     t0=0, times="day",
     rprocess=euler(rproc_r, delta.t = 0.25),
     dmeasure=dmeas_r,
@@ -174,8 +179,7 @@ pomp object:
       barycentric=c("S_0","I_0","R_0")
     ),
     statenames=c("S","I","R","n_SI"),
-    paramnames=c("beta","gamma", "S_0","I_0","R_0")
-  ) -> m1_r
+    paramnames=c("beta","gamma", "S_0","I_0","R_0"))
 ```
 
 ```{r}

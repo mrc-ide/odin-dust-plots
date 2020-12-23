@@ -1,12 +1,14 @@
 ---
 title: "SIR model (pomp)"
 output:
-  pdf_document: default
+  html_document:
+    df_print: paged
   html_notebook: default
+  pdf_document: default
 ---
 
 ```{r}
-library(pomp)
+library(pomp) # Using v3.0.0.0
 library(foreach)
 library(doParallel)
 library(doRNG)
@@ -101,7 +103,7 @@ plot(pfs[[1]])
 
 Infer parameters:
 
-```{r}
+```{r fig.height=10, fig.width=14}
 inferred <- pomp::pmcmc(m1,
                         Nmcmc = 2000, 
                         Np = 100, 
@@ -182,7 +184,40 @@ m1_r <- pomp(
     paramnames=c("beta","gamma", "S_0","I_0","R_0"))
 ```
 
-```{r}
-plot(simulate(m1_r, params=c(beta = 0.2, gamma = 0.1, S_0 = 1000, I_0 = 10, R_0 = 0), nsim = 1)[[1]])
+```{r fig.height=10, fig.width=14}
+plot(simulate(m1_r, params=c(beta = 0.2, gamma = 0.1, S_0 = 1000, I_0 = 10, R_0 = 0), nsim = 1))
 ```
 
+Timings:
+```{r}
+# C functions
+m1 <- pomp(data=incidence_data,
+    t0=0, times="day",
+    rprocess=euler(rproc, delta.t = 0.0001),
+    dmeasure=dmeas,
+    rmeasure=rmeas,
+    rinit=rinit,
+    partrans=parameter_trans(
+      log=c("beta","gamma"),
+      barycentric=c("S_0","I_0","R_0")
+    ),
+    statenames=c("S","I","R","n_SI"),
+    paramnames=c("beta","gamma", "S_0","I_0","R_0")
+  )
+system.time(simulate(m1, params=c(beta = 0.2, gamma = 0.1, S_0 = 1000000, I_0 = 10, R_0 = 0), nsim = 10))
+# R functions
+m1_r <- pomp(
+    data=incidence_data,
+    t0=0, times="day",
+    rprocess=euler(rproc_r, delta.t = 0.0001),
+    dmeasure=dmeas_r,
+    rinit=rinit_r,
+    rmeasure = rmeas_r,
+    partrans=parameter_trans(
+      log=c("beta","gamma"),
+      barycentric=c("S_0","I_0","R_0")
+    ),
+    statenames=c("S","I","R","n_SI"),
+    paramnames=c("beta","gamma", "S_0","I_0","R_0"))
+system.time(simulate(m1_r, params=c(beta = 0.2, gamma = 0.1, S_0 = 1000000, I_0 = 10, R_0 = 0), nsim = 10))
+```
